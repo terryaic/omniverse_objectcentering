@@ -1,0 +1,9 @@
+[package]
+version = "0.1.0"
+title = "object centering"
+
+[dependencies]
+"omni.kit.mainwindow" = {}
+
+[[python.module]]
+name = "cn.appincloud.objectcentering"
