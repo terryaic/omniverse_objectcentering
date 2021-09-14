@@ -229,32 +229,38 @@ class Extension(omni.ext.IExt):
     def doCenterPrim(self, selected):
         points = selected.GetAttribute("points").Get()
         carb.log_info(f"points:{points}")
+        if points is None:
+            return
         ps = np.array(points)
         psmean = ps.mean(axis=0)
         carb.log_info(f"mean:{psmean}")
         ps[:] -= psmean
-        """
-        newpoints = []
-        for point in points:
-            newpoint = [0,0,0]
-            newpoint[0] = point[0] + self.x
-            newpoint[1] = point[1] + self.y
-            newpoint[2] = point[2] + self.z
-            newpoints.append(newpoint)
-        carb.log_info(f"points:{newpoints}")
-        """
         selected.GetAttribute("points").Set(ps)
 
-        translate = selected.GetAttribute("xformOp:translate").Get()
-        carb.log_info(f"translate:{translate}")
-        if translate is not None:
-            translate[0] += psmean[0]
-            translate[1] += psmean[1]
-            translate[2] += psmean[2]
-            selected.GetAttribute("xformOp:translate").Set(translate)
+        scale = [1,1,1]
+        if selected.HasAttribute("xformOp:translate"):
+            attr_position = selected.GetAttribute("xformOp:translate")
+            if selected.HasAttribute("xformOp:scale"):
+                scale = selected.GetAttribute("xformOp:scale").Get()
         else:
-            attr_position = selected.CreateAttribute("xformOp:translate", Sdf.ValueTypeNames.Float3, False)
-            translate = Gf.Vec3f(0,0,0)
+            attr_position = selected.GetParent().GetAttribute("xformOp:translate")
+            if selected.GetParent().GetAttribute("xformOp:scale").Get() is not None:
+                scale = selected.GetParent().GetAttribute("xformOp:scale").Get()
+        carb.log_info(f"attr_position:{attr_position} attr_scale:{scale}")
+        translate = attr_position.Get()
+        if translate is not None:
+            carb.log_info(f"get translate:{translate}")
+            #attr_position = selected.CreateAttribute("xformOp:translate", Sdf.ValueTypeNames.Double3, False)
+            newtranslate = Gf.Vec3d(0,0,0)
+            newtranslate[0] = (translate[0] + psmean[0])*scale[0]
+            newtranslate[1] = (translate[1] + psmean[1])*scale[1]
+            newtranslate[2] = (translate[2] + psmean[2])*scale[2]
+            attr_position.Set(newtranslate)
+            carb.log_info(f"set translate:{newtranslate}")
+        else:
+            attr_position = selected.CreateAttribute("xformOp:translate", Sdf.ValueTypeNames.Double3, False)
+            carb.log_info(f"create translate:{attr_position}")
+            translate = Gf.Vec3d(0,0,0)
             translate[0] += psmean[0]
             translate[1] += psmean[1]
             translate[2] += psmean[2]
