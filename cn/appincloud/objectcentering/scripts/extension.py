@@ -22,144 +22,9 @@ try:
 except:
     standalone_renderer_present = False
 
-MAX_ANGULAR_VELOCITY = 500
-MIN_LINEAR_VELOCITY = -2000
+
 WINDOW_NAME = "Object Centering"
 EXTENSION_NAME = "Object Centering"
-
-class ExtWindow:
-    def _create_window(self):
-        if not standalone_renderer_present:
-            carb.log_warn("Only supported in standalone mode!")
-            return
-        new_window = self._appwindow_factory.create_window_ptr()
-        new_window.startup_with_desc(
-            "%d: test" % (len(self.added_windows)),
-            1200,
-            900,
-            omni.appwindow.POSITION_UNSET,
-            omni.appwindow.POSITION_UNSET,
-            True,
-            True,
-            False,
-            True,
-        )
-        self._imgui_renderer.attach_app_window(new_window)
-        self.added_windows.append(new_window)
-        new_dock_space = omni.ui.DockSpace(self._window_manager.get_window_set_by_app_window(new_window))
-        self.added_dock_spaces.append(new_dock_space)
-
-    def _move_cb_window_active(self):
-        if self._active_os_window is None:
-            carb.log_error("Please select OS window")
-            return
-        if self._active_cb_window is None:
-            carb.log_error("Please select UI window")
-            return
-
-        self._window_manager.move_callback_to_app_window(self._active_cb_window, self._active_os_window)
-
-        ui_window = omni.ui.Workspace.get_window_from_callback(self._active_cb_window)
-        if ui_window is not None:
-            ui_window.notify_app_window_change(self._active_os_window)
-
-        self._refresh()
-
-    def _update_control_frame(self):
-        with self._control_frame:
-            with omni.ui.HStack():
-                if self._active_cb_window is not None and self._active_os_window is not None:
-                    omni.ui.Label(
-                        "UI-cb window '%s', OS Window '%s'"
-                        % (self._active_cb_window.get_title(), self._active_os_window.get_title())
-                    )
-                    btn = omni.ui.Button("Move", width=64, height=16)
-                    btn.set_clicked_fn(self._move_cb_window_active)
-                else:
-                    omni.ui.Label("Please select both UI and OS active windows")
-
-    def _set_active_os_window(self, os_window):
-        self._active_os_window = os_window
-        self._update_control_frame()
-
-    def _set_active_cb_window(self, cb_window):
-        self._active_cb_window = cb_window
-        self._update_control_frame()
-
-    def _output_all_os_windows(self):
-        self._os_wnd_btns = []
-        with self._os_wnd_frame:
-            with omni.ui.VStack():
-                os_windows = self._appwindow_factory.get_windows()
-                for os_window in os_windows:
-                    btn = omni.ui.Button(os_window.get_title(), height=16)
-                    btn.set_clicked_fn(lambda wnd=os_window: self._set_active_os_window(wnd))
-                    self._os_wnd_btns.append(btn)
-
-    def _output_all_cb_windows(self):
-        self._cb_wnd_btns = []
-        with self._cb_wnd_frame:
-            with omni.ui.VStack():
-                window_set_count = self._window_manager.get_window_set_count()
-                for wnd_set_i in range(window_set_count):
-                    window_set = self._window_manager.get_window_set_at(wnd_set_i)
-                    window_set_callbacks_count = self._window_manager.get_window_set_callback_count(window_set)
-                    omni.ui.Label("%d: %d wnds" % (wnd_set_i, window_set_callbacks_count), height=16)
-                    for callback_i in range(window_set_callbacks_count):
-                        cb_window = self._window_manager.get_window_set_callback_at(window_set, callback_i)
-                        btn = omni.ui.Button(cb_window.get_title(), height=16)
-                        btn.set_clicked_fn(lambda wnd=cb_window: self._set_active_cb_window(wnd))
-                        self._cb_wnd_btns.append(btn)
-
-    def _refresh(self):
-        self._output_all_os_windows()
-        self._output_all_cb_windows()
-
-    def _exit(self):
-        omni.kit.app.get_app().post_quit()
-
-    def startup(self):
-        if standalone_renderer_present:
-            self._imgui_renderer = omni.kit.imgui_renderer.acquire_imgui_renderer_interface()
-        self._settings = carb.settings.get_settings()
-        self._window = omni.ui.Window(WINDOW_NAME, width=600, height=340)
-        self._appwindow_factory = omni.appwindow.acquire_app_window_factory_interface()
-        self._window_manager = omni.kit.ui_windowmanager.acquire_window_callback_manager_interface()
-        self.added_windows = []
-        self.added_dock_spaces = []
-        self._active_os_window = None
-        self._active_cb_window = None
-        with self._window.frame:
-            with omni.ui.VStack():
-                with omni.ui.HStack(height=16):
-                    self._btn_create_window = omni.ui.Button("Create 'test' Window", width=100, height=16)
-                    self._btn_create_window.set_clicked_fn(self._create_window)
-                    self._btn_refresh = omni.ui.Button("Refresh", width=100, height=16)
-                    self._btn_refresh.set_clicked_fn(self._refresh)
-                    self._btn_exit = omni.ui.Button("Exit", width=100, height=16)
-                    self._btn_exit.set_clicked_fn(self._exit)
-                self._control_frame = omni.ui.Frame(height=32)
-                with omni.ui.HStack():
-                    self._cb_wnd_frame = omni.ui.Frame(width=omni.ui.Percent(30))
-                    self._os_wnd_frame = omni.ui.Frame(width=omni.ui.Percent(30))
-
-        self._output_all_os_windows()
-        self._output_all_cb_windows()
-        self._update_control_frame()
-
-    def shutdown(self):
-        self._btn_refresh_rgb = None
-        self._btn_create_window = None
-        self._btn_refresh = None
-        self._btn_exit = None
-        self._ui_wnd_btns = None
-        self._os_wnd_btns = None
-        self._cb_wnd_btns = None
-        self._active_os_window = None
-        self._active_cb_window = None
-        self.added_dock_spaces = None
-        self.added_windows = None
-        self._window = None
 
 
 class Extension(omni.ext.IExt):
@@ -224,12 +89,66 @@ class Extension(omni.ext.IExt):
         selected_paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         for selected_path in selected_paths:
             selected = stage.GetPrimAtPath(selected_path)
+            carb.log_info(f"stage:{help(selected)}")
             carb.log_info(f"{selected}")
-            carb.log_info(f"typename:{selected.GetTypeName()}")
+            carb.log_info(f"typename:{selected.GetTypeName()} name:{selected.GetName()}")
             points = selected.GetAttribute("points").Get()
             if points:
-                carb.log_info(f"len:{len(points)}")
+                normals = selected.GetAttribute("normals").Get()
+                faceVertexCounts = selected.GetAttribute("faceVertexCounts").Get()
+                faceVertexIndices = selected.GetAttribute("faceVertexIndices").Get()
+                carb.log_info(f"points len:{len(points)}")
+                carb.log_info(f"normals len:{len(normals)}")
+                carb.log_info(f"faceVertexCounts len:{len(faceVertexCounts)}")
+                carb.log_info(f"faceVertexIndices len:{len(faceVertexIndices)}")
+                self.doSplit(selected)
 
+    #split the subset, not working yet.
+    def doSplit(self, selected):
+        stage = omni.usd.get_context().get_stage()
+        if selected.GetTypeName() != 'Mesh':
+            return
+        name = selected.GetName()
+        points = selected.GetAttribute("points").Get()
+        faceVertexIndices = selected.GetAttribute("faceVertexIndices").Get()
+        carb.log_info(f"faceVertexIndices:{faceVertexIndices}")
+        faceVertexIndices = np.array(faceVertexIndices).reshape(int(len(faceVertexIndices)/4),4)
+        normals = selected.GetAttribute("normals").Get()
+        carb.log_info(f"normals:{normals}")
+        for child in selected.GetAllChildren():
+            subsetName = child.GetName()
+            indices = child.GetAttribute("indices").Get()
+            points1 = points
+            #payload1 = Usd.Stage.CreateNew("payload1.usd")
+            payload1 = stage.DefinePrim("/payload1", "Xform")
+            mesh = stage.DefinePrim(f"/payload1/{name}_{subsetName}", "Mesh")
+            path = f"/payload1/{name}_{subsetName}"
+            mesh = UsdGeom.Mesh.Get(stage, path)
+            mesh.CreatePointsAttr().Set(points1)
+            newVertexIndices = []
+            newNormals = []
+            count = 0
+            for index in faceVertexIndices:
+                toAdd = 4
+                for i in index:
+                    if i not in indices:
+                        #carb.log_info(f"{i} not in index")
+                        toAdd -= 1
+                if toAdd > 0:
+                    newVertexIndices.append(index)
+                    newNormals.append(normals[count*4])
+                    newNormals.append(normals[count*4+1])
+                    newNormals.append(normals[count*4+2])
+                    newNormals.append(normals[count*4+3])
+                count += 1
+            faceCounts = [4]*len(newVertexIndices)
+            newVertexIndices = np.array(newVertexIndices).reshape(len(newVertexIndices)*4)
+            carb.log_info(f"newVertexIndices:{len(newVertexIndices)}")
+            mesh.CreateFaceVertexCountsAttr().Set(faceCounts)
+            mesh.CreateFaceVertexIndicesAttr().Set(newVertexIndices)
+            mesh.CreateNormalsAttr().Set(newNormals)
+
+    #center the selected object
     async def doCenter(self):
         stage = omni.usd.get_context().get_stage()
         selected_paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
@@ -265,7 +184,7 @@ class Extension(omni.ext.IExt):
         ps[:] -= psmean
         selected.GetAttribute("points").Set(ps)
 
-        scale = [1,1,1]
+        scale = [1,1,1]#actually, scale is not used!
         if selected.HasAttribute("xformOp:translate"):
             attr_position = selected.GetAttribute("xformOp:translate")
             if selected.HasAttribute("xformOp:scale"):
@@ -323,9 +242,10 @@ class Extension(omni.ext.IExt):
                         )
                         button2 = omni.ui.Button(button_label2, height=5, style={"padding": 12, "font_size": 20})
                         button2.set_clicked_fn(lambda: asyncio.ensure_future(self.doCenterAll()))
-
+                        """
                         button_label3 = (
                             "test"
                         )
                         button3 = omni.ui.Button(button_label3, height=5, style={"padding": 12, "font_size": 20})
                         button3.set_clicked_fn(lambda: asyncio.ensure_future(self.test()))
+                        """
