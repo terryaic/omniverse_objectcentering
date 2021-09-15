@@ -218,13 +218,41 @@ class Extension(omni.ext.IExt):
     def _on_update(self, dt):
         pass
 
+    async def test(self):
+        stage = omni.usd.get_context().get_stage()
+        carb.log_info(f"stage:{help(stage)}")
+        selected_paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
+        for selected_path in selected_paths:
+            selected = stage.GetPrimAtPath(selected_path)
+            carb.log_info(f"{selected}")
+            carb.log_info(f"typename:{selected.GetTypeName()}")
+            points = selected.GetAttribute("points").Get()
+            if points:
+                carb.log_info(f"len:{len(points)}")
+
     async def doCenter(self):
         stage = omni.usd.get_context().get_stage()
         selected_paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         carb.log_info(f"{selected_paths}")
         for selected_path in selected_paths:
             selected = stage.GetPrimAtPath(selected_path)
-            self.doCenterPrim(selected)
+            carb.log_info(f"selected:{help(selected)}")
+            if selected.GetTypeName() == 'Xform':
+                carb.log_info(f"children:{selected.GetAllChildren()}")
+                for child in selected.GetAllChildren():
+                    self.doCenterPrim(child)
+            else:
+                self.doCenterPrim(selected)
+
+    async def doCenterAll(self):
+        stage = omni.usd.get_context().get_stage()
+        selecteds = stage.Traverse()#omni.usd.get_context().get_selection().get_selected_prim_paths()
+        carb.log_info(f"{selecteds}")
+        for selected in selecteds:
+            if selected.GetTypeName() == 'Xform':
+                continue
+            else:
+                self.doCenterPrim(selected)
 
     def doCenterPrim(self, selected):
         points = selected.GetAttribute("points").Get()
@@ -252,9 +280,9 @@ class Extension(omni.ext.IExt):
             carb.log_info(f"get translate:{translate}")
             #attr_position = selected.CreateAttribute("xformOp:translate", Sdf.ValueTypeNames.Double3, False)
             newtranslate = Gf.Vec3d(0,0,0)
-            newtranslate[0] = (translate[0] + psmean[0])*scale[0]
-            newtranslate[1] = (translate[1] + psmean[1])*scale[1]
-            newtranslate[2] = (translate[2] + psmean[2])*scale[2]
+            newtranslate[0] = translate[0] + psmean[0]
+            newtranslate[1] = translate[1] + psmean[1]
+            newtranslate[2] = translate[2] + psmean[2]
             attr_position.Set(newtranslate)
             carb.log_info(f"set translate:{newtranslate}")
         else:
@@ -284,9 +312,20 @@ class Extension(omni.ext.IExt):
 
                     # Test Drive/Reset Button
                     with omni.ui.HStack():
-                        start_button_label = (
+                        button_label = (
                             "Do center"
                         )
-                        start_button = omni.ui.Button(start_button_label, height=5, style={"padding": 12, "font_size": 20})
+                        button = omni.ui.Button(button_label, height=5, style={"padding": 12, "font_size": 20})
+                        button.set_clicked_fn(lambda: asyncio.ensure_future(self.doCenter()))
 
-                        start_button.set_clicked_fn(lambda: asyncio.ensure_future(self.doCenter()))
+                        button_label2 = (
+                            "Do center all"
+                        )
+                        button2 = omni.ui.Button(button_label2, height=5, style={"padding": 12, "font_size": 20})
+                        button2.set_clicked_fn(lambda: asyncio.ensure_future(self.doCenterAll()))
+
+                        button_label3 = (
+                            "test"
+                        )
+                        button3 = omni.ui.Button(button_label3, height=5, style={"padding": 12, "font_size": 20})
+                        button3.set_clicked_fn(lambda: asyncio.ensure_future(self.test()))
