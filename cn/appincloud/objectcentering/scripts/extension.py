@@ -101,10 +101,90 @@ class Extension(omni.ext.IExt):
                 carb.log_info(f"normals len:{len(normals)}")
                 carb.log_info(f"faceVertexCounts len:{len(faceVertexCounts)}")
                 carb.log_info(f"faceVertexIndices len:{len(faceVertexIndices)}")
-                self.doSplit(selected)
+
+    async def doSplit(self):
+        stage = omni.usd.get_context().get_stage()
+        selected_paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
+        for selected_path in selected_paths:
+            selected = stage.GetPrimAtPath(selected_path)
+            carb.log_info(f"{selected}")
+            carb.log_info(f"typename:{selected.GetTypeName()} name:{selected.GetName()}")
+            points = selected.GetAttribute("points").Get()
+            if points:
+                normals = selected.GetAttribute("normals").Get()
+                faceVertexCounts = selected.GetAttribute("faceVertexCounts").Get()
+                faceVertexIndices = selected.GetAttribute("faceVertexIndices").Get()
+                carb.log_info(f"points len:{len(points)}")
+                carb.log_info(f"normals len:{len(normals)}")
+                carb.log_info(f"faceVertexCounts len:{len(faceVertexCounts)}")
+                carb.log_info(f"faceVertexIndices len:{len(faceVertexIndices)}")
+                self.doSplitObj(selected)
 
     #split the subset, not working yet.
-    def doSplit(self, selected):
+    def doSplitObj(self, selected):
+        points = selected.GetAttribute("points").Get()
+        """
+        points = np.array(selected.GetAttribute("points").Get())
+        carb.log_info(f"{points.shape}")
+        cond = points > 0.00001
+        newpoints = np.where(cond, points, 1000000)
+        newpoints = newpoints[newpoints != (1000000,1000000,1000000)]
+        n = int(len(newpoints) / 3)
+        newpoints = newpoints.reshape(n,3)
+        carb.log_info(f"{newpoints.shape}")
+        """
+        newpoints = []
+        indices = []
+        index = 0
+        for point in points:
+            if point[0] > 0 and point[2] > 0:
+                newpoints.append(point)
+                indices.append(index)
+            index += 1
+        carb.log_info(f"{newpoints}")
+        #selected.GetAttribute("faceVertexCounts").Set([4]*n)
+        #selected.GetAttribute("points").Set(newpoints)
+        self.createO(selected, indices, newpoints)
+        
+    def createO(self, selected, indices, points1):
+            subsetName = ''
+            stage = omni.usd.get_context().get_stage()
+            if selected.GetTypeName() != 'Mesh':
+                return
+            name = selected.GetName()
+            points = selected.GetAttribute("points").Get()
+            normals = selected.GetAttribute("normals").Get()
+            faceVertexCounts = selected.GetAttribute("faceVertexCounts").Get()
+            faceVertexIndices = selected.GetAttribute("faceVertexIndices").Get()
+
+            payload1 = stage.DefinePrim("/payload1", "Xform")
+            mesh = stage.DefinePrim(f"/payload1/{name}_{subsetName}", "Mesh")
+            path = f"/payload1/{name}_{subsetName}"
+            mesh = UsdGeom.Mesh.Get(stage, path)
+            mesh.CreatePointsAttr().Set(points1)
+            newVertexIndices = []
+            newVertexCounts = []
+            newNormals = []
+            count = 0
+            for index in faceVertexCounts:
+                toAdd = index
+                for i in range(index):
+                    if faceVertexIndices[count + i] not in indices:
+                        #carb.log_info(f"{i} not in index")
+                        toAdd = 0
+                if toAdd > 0:
+                    newVertexCounts.append(index)
+                    for i in range(index):
+                        newVertexIndices.append(faceVertexIndices[count + i])
+                        newNormals.append(normals[count +i])
+                count += index
+            carb.log_info(f"newVertexIndices:{len(newVertexIndices)}")
+            mesh.CreateFaceVertexCountsAttr().Set(newVertexCounts)
+            mesh.CreateFaceVertexIndicesAttr().Set(newVertexIndices)
+            mesh.CreateNormalsAttr().Set(newNormals)
+
+    #not used
+    def doSplitObj0(self, selected):
         stage = omni.usd.get_context().get_stage()
         if selected.GetTypeName() != 'Mesh':
             return
@@ -155,7 +235,6 @@ class Extension(omni.ext.IExt):
         carb.log_info(f"{selected_paths}")
         for selected_path in selected_paths:
             selected = stage.GetPrimAtPath(selected_path)
-            carb.log_info(f"selected:{help(selected)}")
             if selected.GetTypeName() == 'Xform':
                 carb.log_info(f"children:{selected.GetAllChildren()}")
                 for child in selected.GetAllChildren():
@@ -243,6 +322,11 @@ class Extension(omni.ext.IExt):
                         button2 = omni.ui.Button(button_label2, height=5, style={"padding": 12, "font_size": 20})
                         button2.set_clicked_fn(lambda: asyncio.ensure_future(self.doCenterAll()))
                         """
+                        button_label3 = (
+                            "Do split"
+                        )
+                        button3 = omni.ui.Button(button_label3, height=5, style={"padding": 12, "font_size": 20})
+                        button3.set_clicked_fn(lambda: asyncio.ensure_future(self.doSplit()))
                         button_label3 = (
                             "test"
                         )
