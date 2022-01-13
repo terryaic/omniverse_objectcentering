@@ -5,5 +5,11 @@ title = "object centering"
 [dependencies]
 "omni.kit.mainwindow" = {}
 
+[python.pipapi] 
+requirements = [
+    "numpy",
+]
+use_online_index = true
+
 [[python.module]]
 name = "cn.appincloud.objectcentering"
